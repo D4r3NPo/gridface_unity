@@ -23,7 +23,7 @@ public class TouchFinger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
         Icon.color = new Color(Icon.color.r,Icon.color.g,Icon.color.b, 1f);
         GridButton gridButton = GetGridButton();
-        if (gridButton) Manager.Instance.OnTouchButton(this,);
+        if (gridButton) Manager.Instance.MoveFingerTo(Finger,gridButton);
     }
 
     GridButton GetGridButton()
