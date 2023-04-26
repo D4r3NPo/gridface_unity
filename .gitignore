@@ -60,3 +60,4 @@ UserSettings/EditorUserSettings.asset
 .DS_Store
 Assets/.DS_Store
 Assets/Plugins
+.idea/**

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 using UnityEngine.Video;
 using File = System.IO.File;
@@ -42,7 +43,14 @@ public class Manager : MonoBehaviour
 
     #endregion
     
-    public string LoadedVideo = string.Empty;
+    const string Header = "Frame,Pouce_L.x ,Pouce_L.y ,Index_L.x ,Index_L.y ,Majeur_L.x ,Majeur_L.y,Annulaire_L.x ,Annulaire_L.y,Auriculaire_L.x,Auriculaire_L.y,Pouce_R.x,Pouce_R.y,Index_R.x,Index_R.y ,Majeur_R.x,Majeur_R.y,Annulaire_R.x,Annulaire_R.y,Auriculaire_R.x,Auriculaire_R.y";
+    
+    string _myLog = "TAB ->| to mask";
+    bool _doShow;
+    const int KChars = 700;
+    public string loadedVideo = string.Empty;
+    FrameAnalysisData _currentFrame = new FrameAnalysisData();
+    Dictionary<long,FrameAnalysis> _frames;
 
     void Awake() => Instance = this;
 
@@ -57,21 +65,19 @@ public class Manager : MonoBehaviour
     IEnumerator SimplePrevious()
     {
         long startFrame = Player.frame;
-        Player.frame = Player.frame - Step <= 0 ? 0 : Player.frame - Step;
+        Player.frame = startFrame - Step <= 0 ? 0 : Player.frame - Step;
         while (Player.frame == startFrame) yield return null;
-        Current = Frames.Exists(x => x.Frame == Player.frame)
-            ? Frames.Find(x => x.Frame == Player.frame).ToData()
-            : new FrameAnalysisData();
+        _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
     }
 
     IEnumerator CopyPrevious()
     {
-        FrameAnalysisData save = Current;
+        FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
-        Player.frame = Player.frame - Step <= 0 ? 0 : (Player.frame - Step);
+        Player.frame = startFrame - Step <= 0 ? 0 : (Player.frame - Step);
         while (Player.frame == startFrame) yield return null;
-        Current = save;
+        _currentFrame = save;
         UpdateCsv();
         UpdateGridButton();
     }
@@ -79,21 +85,19 @@ public class Manager : MonoBehaviour
     IEnumerator SimpleNext()
     {
         long startFrame = Player.frame;
-        Player.frame = Player.frame + Step >= (long)Player.frameCount ? (long)Player.frameCount : Player.frame + Step;
+        Player.frame = startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : Player.frame + Step;
         while (Player.frame == startFrame) yield return null;
-        Current = Frames.Exists(x => x.Frame == Player.frame)
-            ? Frames.Find(x => x.Frame == Player.frame).ToData()
-            : new FrameAnalysisData();
+        _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
     }
 
     IEnumerator CopyNext()
     {
-        FrameAnalysisData save = Current;
+        FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
-        Player.frame = Player.frame + Step >= (long)Player.frameCount ? (long)Player.frameCount : (Player.frame + Step);
+        Player.frame = startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : (Player.frame + Step);
         while (Player.frame == startFrame) yield return null;
-        Current = save;
+        _currentFrame = save;
         UpdateCsv();
         UpdateGridButton();
     }
@@ -101,14 +105,9 @@ public class Manager : MonoBehaviour
     IEnumerator SeekingFor(float time)
     {
         long startFrame = Player.frame;
-
         Player.frame = (long)time;
-
         while (Player.frame == startFrame) yield return null;
-
-        Current = Frames.Exists(x => x.Frame == Player.frame)
-            ? Frames.Find(x => x.Frame == Player.frame).ToData()
-            : new FrameAnalysisData();
+        _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
     }
 
@@ -146,67 +145,51 @@ public class Manager : MonoBehaviour
         if (videoName != "CLOSE")
         {
             Player.url = "file://" + Videopath + "/" + videoName;
-            LoadedVideo = videoName;
+            loadedVideo = videoName;
             while (Player.frameCount == 0) yield return null;
             Timeline.maxValue = Player.frameCount;
-            LoadCSV();
+            LoadCsv();
         }
 
         Videos.SetActive(false);
         VideoGrid.ClearChild();
     }
 
-    public FrameAnalysisData Current = new FrameAnalysisData();
-    public List<FrameAnalysis> Frames;
+    
+    
 
-    void LoadCSV()
+    void LoadCsv()
     {
+        Debug.Log("Load From CSV");
+        
         //Find Curren Load Video Path
-        string path = Path.Combine(_rootPath, Datapath, LoadedVideo.Split('.')[0] + ".csv");
+        string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
 
         //Init Frames
-        Frames = new List<FrameAnalysis>();
+        _frames = new Dictionary<long, FrameAnalysis>();
 
         //Create File if it doesn'n exist
         if (!File.Exists(path)) File.Create(path);
         else
         {
             //Load Frames from file
-            var frames = File.ReadAllLines(path);
-            foreach (var line in frames)
+            var loadedFrames = File.ReadAllLines(path);
+            foreach (var line in loadedFrames)
             {
                 //Skip Title
-                if (line == frames[0]) continue;
+                if (line == loadedFrames[0]) continue;
 
                 var stringValues = line.Split(',');
                 var values = new int[stringValues.Length];
                 for (var i = 0; i < values.Length; i++)
                     values[i] = stringValues[i] != string.Empty ? int.Parse(stringValues[i]) : -1;
 
-                FrameAnalysis newFrame = new FrameAnalysis(values[0])
-                {
-                    Fingers =
-                    {
-                        [Finger.P_L] = new Vector2Int(values[1], values[2]),
-                        [Finger.I_L] = new Vector2Int(values[3], values[4]),
-                        [Finger.M_L] = new Vector2Int(values[5], values[6]),
-                        [Finger.An_L] = new Vector2Int(values[7], values[8]),
-                        [Finger.Au_L] = new Vector2Int(values[9], values[10]),
-                        [Finger.P_R] = new Vector2Int(values[11], values[12]),
-                        [Finger.I_R] = new Vector2Int(values[13], values[14]),
-                        [Finger.M_R] = new Vector2Int(values[15], values[16]),
-                        [Finger.An_R] = new Vector2Int(values[17], values[18]),
-                        [Finger.Au_R] = new Vector2Int(values[19], values[20])
-                    }
-                };
-
-                Frames.Add(newFrame);
+                FrameAnalysis newFrame = new FrameAnalysis(values[0]) { Fingers = { [Finger.P_L] = new Vector2Int(values[1], values[2]), [Finger.I_L] = new Vector2Int(values[3], values[4]), [Finger.M_L] = new Vector2Int(values[5], values[6]), [Finger.An_L] = new Vector2Int(values[7], values[8]), [Finger.Au_L] = new Vector2Int(values[9], values[10]), [Finger.P_R] = new Vector2Int(values[11], values[12]), [Finger.I_R] = new Vector2Int(values[13], values[14]), [Finger.M_R] = new Vector2Int(values[15], values[16]), [Finger.An_R] = new Vector2Int(values[17], values[18]), [Finger.Au_R] = new Vector2Int(values[19], values[20]) } };
+                _frames.Add(values[0],newFrame);
             }
         }
-
-        Current = Frames.Exists(x => x.Frame == 0) ? Frames.Find(x => x.Frame == 0).ToData() : new FrameAnalysisData();
+        _currentFrame = _frames.TryGetValue(0,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
-
     }
 
     float Zoom
@@ -221,55 +204,51 @@ public class Manager : MonoBehaviour
         set => RawImage.uvRect = new Rect(value, RawImage.uvRect.size);
     }
 
-    void Update()
+    void Update() => Inputs();
+    void Inputs()
     {
+        //Controls
         if (Player.url != string.Empty)
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow))
-                Previous(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
-            if (Input.GetKeyDown(KeyCode.RightArrow))
-                Next(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
-            Console.text = "t : " + Player.time + "/" + Player.length.ToString("0.1") + "\n" + "f : " + Player.frame +
-                           "/" + Player.frameCount;
+            if (Input.GetKeyDown(KeyCode.LeftArrow)) Previous(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
+            if (Input.GetKeyDown(KeyCode.RightArrow)) Next(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
+            Console.text = $"t : {Player.time}/{Player.length:0.1}\nf : {Player.frame}/{Player.frameCount}";
         }
         else Console.text = NoVideo;
 
-        if (Input.GetKeyDown(KeyCode.Tab))
-        {
-            doShow = !doShow;
-        }
+        //Toggle Logs
+        if (Input.GetKeyDown(KeyCode.Tab)) _doShow = !_doShow;
 
+        //Zoom
         if (Input.GetKeyDown(KeyCode.P)) Zoom -= 0.1f;
         if (Input.GetKeyDown(KeyCode.M)) Zoom += 0.1f;
-
+        //Video View
         if (Input.GetKeyDown(KeyCode.L)) OffSet = new Vector2(OffSet.x + 0.1f, OffSet.y);
         if (Input.GetKeyDown(KeyCode.I)) OffSet = new Vector2(OffSet.x, OffSet.y + 0.1f);
         if (Input.GetKeyDown(KeyCode.J)) OffSet = new Vector2(OffSet.x - 0.1f, OffSet.y);
         if (Input.GetKeyDown(KeyCode.K)) OffSet = new Vector2(OffSet.x, OffSet.y - 0.1f);
-
-
     }
 
     const string NoVideo = "No video loaded";
 
-    readonly Dictionary<Finger, GridButton> Fingers = new Dictionary<Finger, GridButton>
+    readonly Dictionary<Finger, GridButton> _fingerOnButtons = new Dictionary<Finger, GridButton>
     {
         { Finger.Au_L, null }, { Finger.An_L, null }, { Finger.M_L, null }, { Finger.I_L, null }, { Finger.P_L, null },
         { Finger.Au_R, null }, { Finger.An_R, null }, { Finger.M_R, null }, { Finger.I_R, null }, { Finger.P_R, null }
     };
 
-    bool IsVideoLoaded => LoadedVideo != string.Empty;
+    bool IsVideoLoaded => loadedVideo != string.Empty;
 
     void UpdateGridButton()
     {
-        foreach (var finger in Current.Fingers)
+        foreach (var finger in _currentFrame.FingerPositions)
         foreach (GridButton button in GridButtons)
         {
             if (new Vector2Int((int)button.Row, (int)button.Column) == finger.Value)
             {
                 button.AddFinger(finger.Key);
-                Fingers[finger.Key]?.RemoveFinger(finger.Key);
-                Fingers[finger.Key] = button;
+                _fingerOnButtons[finger.Key]?.RemoveFinger(finger.Key);
+                _fingerOnButtons[finger.Key] = button;
             }
             else button.RemoveFinger(finger.Key);
         }
@@ -277,113 +256,67 @@ public class Manager : MonoBehaviour
 
     public void MoveFingerTo(Finger finger, GridButton gridButton)
     {
-        if (!IsVideoLoaded) return;
+        if (!IsVideoLoaded || finger == Finger.None) return;
 
-        Fingers[finger]?.RemoveFinger(finger);
+        _fingerOnButtons[finger]?.RemoveFinger(finger);
 
-        if (gridButton == Fingers[finger])
+        if (gridButton == _fingerOnButtons[finger])
         {
-            Fingers[finger] = null;
-            Current.Fingers[finger] = new Vector2Int((int)Row.None, (int)Column.None);
+            _fingerOnButtons[finger] = null;
+            _currentFrame.FingerPositions[finger] = new Vector2Int((int)Row.None, (int)Column.None);
         }
         else
         {
-            Fingers[finger] = gridButton;
-            Fingers[finger].AddFinger(finger);
-            Current.Fingers[finger] = new Vector2Int((int)gridButton.Row, (int)gridButton.Column);
+            _fingerOnButtons[finger] = gridButton;
+            _fingerOnButtons[finger].AddFinger(finger);
+            _currentFrame.FingerPositions[finger] = new Vector2Int((int)gridButton.Row, (int)gridButton.Column);
         }
 
         UpdateCsv();
     }
 
-    Finger GetFinger() =>
-        Input.GetKey(KeyCode.Space)
-            ? Input.GetKey(KeyCode.C)
-                ? Finger.P_R
-                : Input.GetKey(KeyCode.F)
-                    ? Finger.I_R
-                    : Input.GetKey(KeyCode.E)
-                        ? Finger.M_R
-                        : Input.GetKey(KeyCode.Z)
-                            ? Finger.An_R
-                            : Input.GetKey(KeyCode.Q)
-                                ? Finger.Au_R
-                                : Finger.None
-            : Input.GetKey(KeyCode.C)
-                ? Finger.P_L
-                : Input.GetKey(KeyCode.F)
-                    ? Finger.I_L
-                    : Input.GetKey(KeyCode.E)
-                        ? Finger.M_L
-                        : Input.GetKey(KeyCode.Z)
-                            ? Finger.An_L
-                            : Input.GetKey(KeyCode.Q)
-                                ? Finger.Au_L
-                                : Finger.None;
+    static Finger GetFinger() => Input.GetKey(KeyCode.Space) ? Input.GetKey(KeyCode.C) ? Finger.P_R : Input.GetKey(KeyCode.F) ? Finger.I_R : Input.GetKey(KeyCode.E) ? Finger.M_R : Input.GetKey(KeyCode.Z) ? Finger.An_R : Input.GetKey(KeyCode.Q) ? Finger.Au_R : Finger.None : Input.GetKey(KeyCode.C) ? Finger.P_L : Input.GetKey(KeyCode.F) ? Finger.I_L : Input.GetKey(KeyCode.E) ? Finger.M_L : Input.GetKey(KeyCode.Z) ? Finger.An_L : Input.GetKey(KeyCode.Q) ? Finger.Au_L : Finger.None;
 
-    public void OnButton(GridButton button) { MoveFingerTo(GetFinger(), button); }
+    public void OnButton(GridButton button) => MoveFingerTo(GetFinger(), button);
 
     void UpdateCsv()
     {
-        Debug.Log("Test");
-        if (Frames.Exists(x => x.Frame == Player.frame)) Frames.Find(x => x.Frame == Player.frame).FromData(Current);
-        else Frames.Add(new FrameAnalysis(Player.frame, Current));
+        Debug.Log("UpdateCSV");
+        var frame = Player.frame;
+        if(_frames.TryGetValue(frame,out FrameAnalysis value)) value.FromData(_currentFrame);
+        else _frames.Add(Player.frame,new FrameAnalysis(frame, _currentFrame));
+        //frames.Sort();
+        var lines = new string[_frames.Count + 1];
+        lines[0] = Header;
+        for (var i = 1; i < _frames.Count + 1; i++) lines[i] = _frames[i - 1].ToString();
 
-        Frames.Sort();
-        string[] lines = new string[Frames.Count + 1];
-        lines[0] = HEADER;
-        for (int i = 1; i < Frames.Count + 1; i++) lines[i] = Frames[i - 1].ToString();
-
-        string path = Path.Combine(_rootPath, Datapath, LoadedVideo.Split('.')[0] + ".csv");
+        var path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
         File.WriteAllLines(path, lines);
     }
 
-    const string HEADER =
-        "Frame,Pouce_L.x ,Pouce_L.y ,Index_L.x ,Index_L.y ,Majeur_L.x ,Majeur_L.y,Annulaire_L.x ,Annulaire_L.y,Auriculaire_L.x,Auriculaire_L.y,Pouce_R.x,Pouce_R.y,Index_R.x,Index_R.y ,Majeur_R.x,Majeur_R.y,Annulaire_R.x,Annulaire_R.y,Auriculaire_R.x,Auriculaire_R.y";
-
-    string myLog = "TAB ->| to mask";
-    string filename => LoadedVideo;
-    bool doShow = false;
-    int kChars = 700;
+   
     void OnEnable() => Application.logMessageReceived += Log;
     void OnDisable() => Application.logMessageReceived -= Log;
-
-    public void Log(string logString, string stackTrace, LogType type)
+    void Log(string logString, string stackTrace, LogType type)
     {
-        // for onscreen...
-        myLog = $"{type}|{stackTrace} {logString}\n{myLog}";
-        if (myLog.Length > kChars)
-        {
-            myLog = myLog.Substring(myLog.Length - kChars);
-        }
-
-        // for the file ...
+        _myLog = $"{type}|{stackTrace} {logString}\n{_myLog}";
+        if (_myLog.Length > KChars) _myLog = _myLog.Substring(_myLog.Length - KChars);
         var path = Path.Combine(Datapath, "log.txt");
-
-        try
-        {
-            File.AppendAllText(path, $"{type}|{stackTrace} {logString}\n");
-        }
-        catch
-        {
-        }
+        try { File.AppendAllText(path, $"{type}|{stackTrace} {logString}\n"); }
+        catch { /* ignored*/ }
     }
 
     void OnGUI()
     {
-        if (!doShow) return;
-        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity,
-            new Vector3(Screen.width / 1200.0f, Screen.height / 800.0f, 1.0f));
-        GUI.TextArea(new Rect(10, 10, 540, 370), myLog);
+        if (!_doShow) return;
+        GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(Screen.width / 1200.0f, Screen.height / 800.0f, 1.0f));
+        GUI.TextArea(new Rect(10, 10, 540, 370), _myLog);
     }
 }
 
-
-
-[Serializable]
 public class FrameAnalysis : IComparable<FrameAnalysis>
 {
-    public long Frame;
+    readonly long _frame;
 
     public readonly Dictionary<Finger, Vector2Int> Fingers = new Dictionary<Finger, Vector2Int>
     {
@@ -394,43 +327,41 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
     };
 
     int IComparable<FrameAnalysis>.CompareTo(FrameAnalysis other) =>
-        other == null ? 1 : this.Frame.CompareTo(other.Frame);
+        other == null ? 1 : _frame.CompareTo(other._frame);
 
-    public FrameAnalysis(long frame) => Frame = frame;
+    public FrameAnalysis(long frame) => _frame = frame;
     public FrameAnalysis(long frame, FrameAnalysisData data)
     {
-        Frame = frame;
-        foreach (var dataFinger in data.Fingers) Fingers[dataFinger.Key] = dataFinger.Value;
+        _frame = frame;
+        foreach (var dataFinger in data.FingerPositions) Fingers[dataFinger.Key] = dataFinger.Value;
     }
 
     public void FromData(FrameAnalysisData data)
     {
-        foreach (var dataFinger in data.Fingers) Fingers[dataFinger.Key] = dataFinger.Value;
+        foreach (var dataFinger in data.FingerPositions) Fingers[dataFinger.Key] = dataFinger.Value;
     }
 
     public override string ToString()
     {
-        var @return = $"{Frame},";
+        var @return = $"{_frame},";
         foreach (Vector2Int finger in Fingers.Values) @return += $"{finger.x},{finger.y},";
         return @return.Remove(@return.Length - 1);
     }
 
     public FrameAnalysisData ToData()
     {
-        var data = new FrameAnalysisData();
-        foreach (var finger in Fingers) data.Fingers[finger.Key] = finger.Value;
+        FrameAnalysisData data = new FrameAnalysisData();
+        foreach (var finger in Fingers) data.FingerPositions[finger.Key] = finger.Value;
         return data;
     }
 }
-
-[Serializable]
 public class FrameAnalysisData
 {
-    public readonly Dictionary<Finger, Vector2Int> Fingers = new Dictionary<Finger, Vector2Int> { { Finger.P_L,-Vector2Int.one}, { Finger.I_L,-Vector2Int.one}, { Finger.M_L,-Vector2Int.one}, { Finger.An_L,-Vector2Int.one}, { Finger.Au_L,-Vector2Int.one}, { Finger.P_R,-Vector2Int.one}, { Finger.I_R,-Vector2Int.one}, { Finger.M_R,-Vector2Int.one}, { Finger.An_R,-Vector2Int.one}, { Finger.Au_R,-Vector2Int.one} };
+    public readonly Dictionary<Finger, Vector2Int> FingerPositions = new Dictionary<Finger, Vector2Int> { { Finger.P_L,-Vector2Int.one}, { Finger.I_L,-Vector2Int.one}, { Finger.M_L,-Vector2Int.one}, { Finger.An_L,-Vector2Int.one}, { Finger.Au_L,-Vector2Int.one}, { Finger.P_R,-Vector2Int.one}, { Finger.I_R,-Vector2Int.one}, { Finger.M_R,-Vector2Int.one}, { Finger.An_R,-Vector2Int.one}, { Finger.Au_R,-Vector2Int.one} };
     public override string ToString()
     {
         var @return = "";
-        foreach (Vector2Int finger in Fingers.Values) @return += $"{finger.x},{finger.y},";
+        foreach (Vector2Int finger in FingerPositions.Values) @return += $"{finger.x},{finger.y},";
         return @return.Remove(@return.Length - 1);
     }
 }
