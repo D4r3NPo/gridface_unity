@@ -241,13 +241,13 @@ public class Manager : MonoBehaviour
 
     void UpdateGridButton()
     {
-        foreach (var finger in _currentFrame.FingerPositions)
         foreach (GridButton button in GridButtons)
+        foreach (var finger in _currentFrame.FingerPositions)
         {
             if (new Vector2Int((int)button.Row, (int)button.Column) == finger.Value)
             {
-                button.AddFinger(finger.Key);
                 _fingerOnButtons[finger.Key]?.RemoveFinger(finger.Key);
+                button.AddFinger(finger.Key);
                 _fingerOnButtons[finger.Key] = button;
             }
             else button.RemoveFinger(finger.Key);
@@ -282,13 +282,14 @@ public class Manager : MonoBehaviour
     void UpdateCsv()
     {
         Debug.Log("UpdateCSV");
+        
         var frame = Player.frame;
+        
         if(_frames.TryGetValue(frame,out FrameAnalysis value)) value.FromData(_currentFrame);
         else _frames.Add(Player.frame,new FrameAnalysis(frame, _currentFrame));
-        //frames.Sort();
-        var lines = new string[_frames.Count + 1];
-        lines[0] = Header;
-        for (var i = 1; i < _frames.Count + 1; i++) lines[i] = _frames[i - 1].ToString();
+
+        var lines = new List<string> { Header };
+        foreach (FrameAnalysis frameAnalysis in _frames.Values) lines.Add(frameAnalysis.ToString());
 
         var path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
         File.WriteAllLines(path, lines);
