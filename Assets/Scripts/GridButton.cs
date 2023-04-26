@@ -23,22 +23,20 @@ public class GridButton : MonoBehaviour
     void UpdateVisual()
     {
         Text.text = "";
-        foreach (var item in Fingers)
-        {
-            Text.text += item.ToString() + "\n";
-        }
+        foreach (Finger finger in Fingers) Text.text += finger + "\n";
     }
 
     [Header("Setup")]
     public Text Text;
     public Image Assignement;
 
-    private void OnValidate()
+    void OnValidate()
     {
-        if (Text) Text.text = Column.ToString() + "/" + Row.ToString();
+        if (Text) Text.text = $"{Column} / {Row}";
     }
     void Awake()
     {
+        name = Text.name = Assignement.name = $"{Row} | {Column}";
         Assignement.enabled = false;
         Text.text = "";
     }

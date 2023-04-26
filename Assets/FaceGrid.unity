@@ -19010,6 +19010,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Step: 5
+  EventSystem: {fileID: 1234794035}
   RawImage: {fileID: 1353859124}
   Timeline: {fileID: 2053579228}
   Player: {fileID: 1234794033}
@@ -19226,6 +19227,7 @@ MonoBehaviour:
     Annulaire_R: {x: 0, y: 0}
     Auriculaire_R: {x: 0, y: 0}
   Frames: []
+  Raycaster: {fileID: 1355064681}
 --- !u!4 &1234794032
 Transform:
   m_ObjectHideFlags: 0
@@ -33604,11 +33606,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8937402661513654671, guid: 6743e403015644b1ba68e4156138e90b, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 0.000083923
       objectReference: {fileID: 0}
     - target: {fileID: 8937402661513654671, guid: 6743e403015644b1ba68e4156138e90b, type: 3}
       propertyPath: m_SizeDelta.y
-      value: -0.4469757
+      value: -0.447
       objectReference: {fileID: 0}
     - target: {fileID: 8937402661513654671, guid: 6743e403015644b1ba68e4156138e90b, type: 3}
       propertyPath: m_LocalPosition.x
@@ -33640,7 +33642,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8937402661513654671, guid: 6743e403015644b1ba68e4156138e90b, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: -0.00012207031
       objectReference: {fileID: 0}
     - target: {fileID: 8937402661513654671, guid: 6743e403015644b1ba68e4156138e90b, type: 3}
       propertyPath: m_AnchoredPosition.y
