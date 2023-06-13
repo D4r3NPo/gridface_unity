@@ -7,32 +7,40 @@ public class GridButton : MonoBehaviour
     public Row Row;
     public Column Column;
     public Sprite[] FingerIcons;
-    public List<Finger> Fingers = new();
+    //Finger _finger;
+    List<Finger> _fingers = new();
+    
     public void AddFinger(Finger finger)
     {
-        Fingers.AddIfNo(finger);
+        //_finger = finger;
+        _fingers.AddIfNo(finger);
         UpdateVisual();
     }
     public void RemoveFinger(Finger finger)
     {
-        Fingers.RemoveIf(finger);
+        //_finger = Finger.None;
+        _fingers.RemoveIf(finger);
         UpdateVisual();
     }
     void UpdateVisual()
     {
-        if (Fingers.Count > 0)
+        Text.text = "";
+        foreach (Finger finger in _fingers) Text.text += finger + "\n";
+        if (_fingers.Count > 0)
         {
-            Assignement.sprite = FingerIcons[(int)Fingers[0]];
             Assignement.enabled = true;
+            Assignement.sprite = FingerIcons[(int)_fingers[0]];
         }
-        else Assignement.enabled = false;
-        //Text.text = "";
-        //foreach (Finger finger in Fingers) Text.text += finger + "\n";
+        else
+        {
+            Assignement.enabled = false;
+            Assignement.sprite = null;
+        }
     }
 
     [Header("Setup")]
-    public Text Text;
-    public Image Assignement;
+    [SerializeField] Text Text;
+    [SerializeField] Image Assignement;
 
     void OnValidate()
     {

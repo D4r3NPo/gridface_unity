@@ -30,13 +30,19 @@ public class Manager : MonoBehaviour
     public Transform VideoGrid;
     public GameObject VideoButton;
     public GameObject Videos;
-    public List<GridButton> GridButtons = new List<GridButton>();
+    public List<GridButton> GridButtons = new();
 
     #endregion
 
     #region Path
 
-    readonly string _rootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GridFace");
+    //readonly string _rootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GridFace");
+    readonly string _rootPath = Path.Combine(
+        Application.platform != RuntimePlatform.IPhonePlayer ?
+            Environment.GetFolderPath(Environment.SpecialFolder.Desktop) 
+            : Application.persistentDataPath,
+        "GridFace");
+
     string Videopath => Path.Combine(_rootPath, "Video");
     string Datapath => Path.Combine(_rootPath, "Data");
 
@@ -48,7 +54,7 @@ public class Manager : MonoBehaviour
     bool _doShow;
     const int KChars = 700;
     public string loadedVideo = string.Empty;
-    FrameAnalysisData _currentFrame = new FrameAnalysisData();
+    FrameAnalysisData _currentFrame = new();
     Dictionary<long,FrameAnalysis> _frames;
 
     void Awake() => Instance = this;
@@ -74,7 +80,7 @@ public class Manager : MonoBehaviour
     {
         FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
-        Player.frame = startFrame - Step <= 0 ? 0 : (Player.frame - Step);
+        Player.frame = startFrame - Step <= 0 ? 0 : Player.frame - Step;
         while (Player.frame == startFrame) yield return null;
         _currentFrame = save;
         UpdateCsv();
@@ -183,7 +189,7 @@ public class Manager : MonoBehaviour
                 for (var i = 0; i < values.Length; i++)
                     values[i] = stringValues[i] != string.Empty ? int.Parse(stringValues[i]) : -1;
 
-                FrameAnalysis newFrame = new FrameAnalysis(values[0]) { Fingers = { [Finger.P_L] = new Vector2Int(values[1], values[2]), [Finger.I_L] = new Vector2Int(values[3], values[4]), [Finger.M_L] = new Vector2Int(values[5], values[6]), [Finger.An_L] = new Vector2Int(values[7], values[8]), [Finger.Au_L] = new Vector2Int(values[9], values[10]), [Finger.P_R] = new Vector2Int(values[11], values[12]), [Finger.I_R] = new Vector2Int(values[13], values[14]), [Finger.M_R] = new Vector2Int(values[15], values[16]), [Finger.An_R] = new Vector2Int(values[17], values[18]), [Finger.Au_R] = new Vector2Int(values[19], values[20]) } };
+                FrameAnalysis newFrame = new(values[0]) { Fingers = { [Finger.P_L] = new Vector2Int(values[1], values[2]), [Finger.I_L] = new Vector2Int(values[3], values[4]), [Finger.M_L] = new Vector2Int(values[5], values[6]), [Finger.An_L] = new Vector2Int(values[7], values[8]), [Finger.Au_L] = new Vector2Int(values[9], values[10]), [Finger.P_R] = new Vector2Int(values[11], values[12]), [Finger.I_R] = new Vector2Int(values[13], values[14]), [Finger.M_R] = new Vector2Int(values[15], values[16]), [Finger.An_R] = new Vector2Int(values[17], values[18]), [Finger.Au_R] = new Vector2Int(values[19], values[20]) } };
                 _frames.Add(values[0],newFrame);
             }
         }
@@ -199,7 +205,7 @@ public class Manager : MonoBehaviour
 
     Vector2 OffSet
     {
-        get => new Vector2(RawImage.uvRect.x, RawImage.uvRect.y);
+        get => new(RawImage.uvRect.x, RawImage.uvRect.y);
         set => RawImage.uvRect = new Rect(value, RawImage.uvRect.size);
     }
 
@@ -230,7 +236,7 @@ public class Manager : MonoBehaviour
 
     const string NoVideo = "No video loaded";
 
-    readonly Dictionary<Finger, GridButton> _fingerOnButtons = new Dictionary<Finger, GridButton>
+    readonly Dictionary<Finger, GridButton> _fingerOnButtons = new()
     {
         { Finger.Au_L, null }, { Finger.An_L, null }, { Finger.M_L, null }, { Finger.I_L, null }, { Finger.P_L, null },
         { Finger.Au_R, null }, { Finger.An_R, null }, { Finger.M_R, null }, { Finger.I_R, null }, { Finger.P_R, null }

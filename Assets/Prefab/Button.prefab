@@ -222,7 +222,6 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 12a8c0d3bfea847f4bff943ce01685bd, type: 3}
   - {fileID: 21300000, guid: 07be9492e32d74a54a97ab68d69f1c7c, type: 3}
   - {fileID: 21300000, guid: c573d09c93c1b44c7804d49aacceb642, type: 3}
-  Fingers: 
   Text: {fileID: 8937402662130434399}
   Assignement: {fileID: 7951239089392921021}
 --- !u!1 &8937402662130434397
@@ -285,7 +284,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Color: {r: 1, g: 0, b: 0, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1

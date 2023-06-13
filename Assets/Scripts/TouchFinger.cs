@@ -1,39 +1,56 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-public class TouchFinger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+public class TouchFinger : MonoBehaviour, IPointerDownHandler, IPointerUpHandler,IPointerMoveHandler
 {
-    public Finger Finger;
-    public GraphicRaycaster Raycaster;
-    public EventSystem EventSystem;
-    public Image Icon;
+    [FormerlySerializedAs("Finger")] public Finger finger;
+    GraphicRaycaster _raycaster;
+    EventSystem _eventSystem;
+    RectTransform _rectTransform;
+    Image _icon;
+    Vector3 _initPosition;
+    bool _drag;
 
     void Awake()
     {
-        Icon = GetComponent<Image>();
-        Raycaster = GetComponentInParent<GraphicRaycaster>();
-        EventSystem = EventSystem.current;
+        _icon = GetComponent<Image>();
+        _raycaster = GetComponentInParent<GraphicRaycaster>();
+        _eventSystem = EventSystem.current;
+        //_rectTransform = GetComponent<RectTransform>();
+        //_initPosition = _rectTransform.;
     }
 
-    public void OnPointerDown(PointerEventData eventData) => Icon.color = new Color(Icon.color.r,Icon.color.g,Icon.color.b, 0.5f);
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        //_drag = true;
+        _icon.color = new Color(_icon.color.r, _icon.color.g, _icon.color.b, 0.5f);
+    }
 
     public void OnPointerUp(PointerEventData eventData)
     {
-        Icon.color = new Color(Icon.color.r,Icon.color.g,Icon.color.b, 1f);
+        //_drag = false;
+        //_rectTransform.position = _initPosition;
+        _icon.color = new Color(_icon.color.r,_icon.color.g,_icon.color.b, 1f);
         GridButton gridButton = GetGridButton();
-        if (gridButton) Manager.Instance.MoveFingerTo(Finger,gridButton);
+        if (gridButton) Manager.Instance.MoveFingerTo(finger,gridButton);
     }
 
     GridButton GetGridButton()
     {
-        PointerEventData pointerEventData = new PointerEventData(EventSystem) { position = Input.mousePosition };
+        PointerEventData pointerEventData = new(_eventSystem) { position = Input.mousePosition };
         var results = new List<RaycastResult>();
-        Raycaster.Raycast(pointerEventData, results);
+        _raycaster.Raycast(pointerEventData, results);
         foreach (RaycastResult result in results)
             if (result.gameObject.transform.parent.TryGetComponent(out GridButton gridButton))
                 return gridButton;
         return null;
+    }
+
+    public void OnPointerMove(PointerEventData eventData)
+    {
+        //if(_drag) _rectTransform.position = eventData.position;
     }
 }
