@@ -36,11 +36,10 @@ public class Manager : MonoBehaviour
 
     #region Path
 
-    //readonly string _rootPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "GridFace");
     readonly string _rootPath = Path.Combine(
-        Application.platform != RuntimePlatform.IPhonePlayer ?
-            Environment.GetFolderPath(Environment.SpecialFolder.Desktop) 
-            : Application.persistentDataPath,
+        Application.platform == RuntimePlatform.IPhonePlayer ?
+            Application.persistentDataPath
+            : Environment.GetFolderPath(Environment.SpecialFolder.Desktop) ,
         "GridFace");
 
     string Videopath => Path.Combine(_rootPath, "Video");
