@@ -10,19 +10,38 @@ using File = System.IO.File;
 
 public enum Row { Un, Deux, Trois, Quatre, Cinq, Six, Sept, Huit, Neuf, Dix, Onze, Douze, Treize, Quatoze, Quinze, None = -1 }
 public enum Column { A, B, C, D, E, F, G, H, I, J, K, L, M, None= -1 }
-public enum Finger { None, P_L, I_L, M_L, An_L, Au_L, P_R, I_R, M_R, An_R, Au_R }
-
-public class Manager : MonoBehaviour
+public struct Position : IEquatable<Position>
 {
-    public static Manager Instance;
+    public Row Row;
+    public Column Column;
 
+    public static Position None = new(Column.None, Row.None);
+    public Position(Column column, Row row)
+    {
+        Column = column;
+        Row = row;
+    }
+
+    public static bool operator ==(Position a, Position b) => a.Row == b.Row && a.Column == b.Column;
+    public static bool operator !=(Position a, Position b) => !(a == b);
+    public bool Equals(Position other) => Row == other.Row && Column == other.Column;
+    public override bool Equals(object obj) => obj is Position other && Equals(other);
+    public override int GetHashCode() => HashCode.Combine((int)Row, (int)Column);
+    public override string ToString() => $"{Row}| {Column}";
+}
+public class App : MonoBehaviour
+{ 
+    public static App Instance;
+    public event Action<Finger.ID, Position> PositionChanged;
+    
     [Header("--- Setting ---")] public long Step;
-
+    
+    const string NoVideo = "No video loaded";
+    bool IsVideoLoaded => loadedVideo != string.Empty;
+    
     #region Components
 
     [Header("--- Setup ---")] 
-    public GraphicRaycaster Raycaster;
-    public EventSystem EventSystem;
     public RawImage RawImage;
     public Slider Timeline;
     public VideoPlayer Player;
@@ -31,6 +50,7 @@ public class Manager : MonoBehaviour
     public GameObject VideoButton;
     public GameObject Videos;
     public List<GridButton> GridButtons = new();
+    public List<Finger> Fingers = new();
 
     #endregion
 
@@ -158,10 +178,7 @@ public class Manager : MonoBehaviour
         Videos.SetActive(false);
         VideoGrid.ClearChild();
     }
-
     
-    
-
     void LoadCsv()
     {
         Debug.Log("Load From CSV");
@@ -188,7 +205,7 @@ public class Manager : MonoBehaviour
                 for (var i = 0; i < values.Length; i++)
                     values[i] = stringValues[i] != string.Empty ? int.Parse(stringValues[i]) : -1;
 
-                FrameAnalysis newFrame = new(values[0]) { Fingers = { [Finger.P_L] = new Vector2Int(values[1], values[2]), [Finger.I_L] = new Vector2Int(values[3], values[4]), [Finger.M_L] = new Vector2Int(values[5], values[6]), [Finger.An_L] = new Vector2Int(values[7], values[8]), [Finger.Au_L] = new Vector2Int(values[9], values[10]), [Finger.P_R] = new Vector2Int(values[11], values[12]), [Finger.I_R] = new Vector2Int(values[13], values[14]), [Finger.M_R] = new Vector2Int(values[15], values[16]), [Finger.An_R] = new Vector2Int(values[17], values[18]), [Finger.Au_R] = new Vector2Int(values[19], values[20]) } };
+                FrameAnalysis newFrame = new(values[0]) { Fingers = { [Finger.ID.P_L] = new Vector2Int(values[1], values[2]), [Finger.ID.I_L] = new Vector2Int(values[3], values[4]), [Finger.ID.M_L] = new Vector2Int(values[5], values[6]), [Finger.ID.An_L] = new Vector2Int(values[7], values[8]), [Finger.ID.Au_L] = new Vector2Int(values[9], values[10]), [Finger.ID.P_R] = new Vector2Int(values[11], values[12]), [Finger.ID.I_R] = new Vector2Int(values[13], values[14]), [Finger.ID.M_R] = new Vector2Int(values[15], values[16]), [Finger.ID.An_R] = new Vector2Int(values[17], values[18]), [Finger.ID.Au_R] = new Vector2Int(values[19], values[20]) } };
                 _frames.Add(values[0],newFrame);
             }
         }
@@ -242,55 +259,27 @@ public class Manager : MonoBehaviour
         }
     }
 
-    const string NoVideo = "No video loaded";
-
-    readonly Dictionary<Finger, GridButton> _fingerOnButtons = new()
-    {
-        { Finger.Au_L, null }, { Finger.An_L, null }, { Finger.M_L, null }, { Finger.I_L, null }, { Finger.P_L, null },
-        { Finger.Au_R, null }, { Finger.An_R, null }, { Finger.M_R, null }, { Finger.I_R, null }, { Finger.P_R, null }
-    };
-
-    bool IsVideoLoaded => loadedVideo != string.Empty;
-
     void UpdateGridButton()
     {
-        foreach (GridButton button in GridButtons)
-        foreach (var finger in _currentFrame.FingerPositions)
-        {
-            if (new Vector2Int((int)button.Row, (int)button.Column) == finger.Value)
-            {
-                _fingerOnButtons[finger.Key]?.RemoveFinger(finger.Key);
-                button.AddFinger(finger.Key);
-                _fingerOnButtons[finger.Key] = button;
-            }
-            else button.RemoveFinger(finger.Key);
-        }
+        foreach (var fingerData in _currentFrame.FingerPositions)
+            PositionChanged?.Invoke(fingerData.Key, new Position((Column)fingerData.Value.y, (Row)fingerData.Value.x));
     }
 
-    public void MoveFingerTo(Finger finger, GridButton gridButton)
+    public void MoveFingerTo(Finger.ID fingerID, Position position)
     {
-        if (!IsVideoLoaded || finger == Finger.None) return;
+        Debug.Log("Move" + fingerID + " Finger To " + position);
+        
+        if (!IsVideoLoaded || fingerID == Finger.ID.None) return;
 
-        _fingerOnButtons[finger]?.RemoveFinger(finger);
-
-        if (gridButton == _fingerOnButtons[finger])
-        {
-            _fingerOnButtons[finger] = null;
-            _currentFrame.FingerPositions[finger] = new Vector2Int((int)Row.None, (int)Column.None);
-        }
-        else
-        {
-            _fingerOnButtons[finger] = gridButton;
-            _fingerOnButtons[finger].AddFinger(finger);
-            _currentFrame.FingerPositions[finger] = new Vector2Int((int)gridButton.Row, (int)gridButton.Column);
-        }
-
+        _currentFrame.FingerPositions[fingerID] = new Vector2Int((int)position.Row, (int)position.Column);
+        
+        PositionChanged?.Invoke(fingerID,position);
+        
         UpdateCsv();
     }
 
-    static Finger GetFinger() => Input.GetKey(KeyCode.Space) ? Input.GetKey(KeyCode.C) ? Finger.P_R : Input.GetKey(KeyCode.F) ? Finger.I_R : Input.GetKey(KeyCode.E) ? Finger.M_R : Input.GetKey(KeyCode.Z) ? Finger.An_R : Input.GetKey(KeyCode.Q) ? Finger.Au_R : Finger.None : Input.GetKey(KeyCode.C) ? Finger.P_L : Input.GetKey(KeyCode.F) ? Finger.I_L : Input.GetKey(KeyCode.E) ? Finger.M_L : Input.GetKey(KeyCode.Z) ? Finger.An_L : Input.GetKey(KeyCode.Q) ? Finger.Au_L : Finger.None;
-
-    public void OnButton(GridButton button) => MoveFingerTo(GetFinger(), button);
+    static Finger.ID GetFinger() => Input.GetKey(KeyCode.Space) ? Input.GetKey(KeyCode.C) ? Finger.ID.P_R : Input.GetKey(KeyCode.F) ? Finger.ID.I_R : Input.GetKey(KeyCode.E) ? Finger.ID.M_R : Input.GetKey(KeyCode.Z) ? Finger.ID.An_R : Input.GetKey(KeyCode.Q) ? Finger.ID.Au_R : Finger.ID.None : Input.GetKey(KeyCode.C) ? Finger.ID.P_L : Input.GetKey(KeyCode.F) ? Finger.ID.I_L : Input.GetKey(KeyCode.E) ? Finger.ID.M_L : Input.GetKey(KeyCode.Z) ? Finger.ID.An_L : Input.GetKey(KeyCode.Q) ? Finger.ID.Au_L : Finger.ID.None;
+    public void OnButton(GridButton button) => MoveFingerTo(GetFinger(), button.Position);
 
     void UpdateCsv()
     {
@@ -332,12 +321,12 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
 {
     readonly long _frame;
 
-    public readonly Dictionary<Finger, Vector2Int> Fingers = new Dictionary<Finger, Vector2Int>
+    public readonly Dictionary<Finger.ID, Vector2Int> Fingers = new()
     {
-        { Finger.P_L, Vector2Int.one * 16 }, { Finger.I_L, Vector2Int.one * 16 }, { Finger.M_L, Vector2Int.one * 16 },
-        { Finger.An_L, Vector2Int.one * 16 }, { Finger.Au_L, Vector2Int.one * 16 }, { Finger.P_R, Vector2Int.one * 16 },
-        { Finger.I_R, Vector2Int.one * 16 }, { Finger.M_R, Vector2Int.one * 16 }, { Finger.An_R, Vector2Int.one * 16 },
-        { Finger.Au_R, Vector2Int.one * 16 }
+        { Finger.ID.P_L, Vector2Int.one * 16 }, { Finger.ID.I_L, Vector2Int.one * 16 }, { Finger.ID.M_L, Vector2Int.one * 16 },
+        { Finger.ID.An_L, Vector2Int.one * 16 }, { Finger.ID.Au_L, Vector2Int.one * 16 }, { Finger.ID.P_R, Vector2Int.one * 16 },
+        { Finger.ID.I_R, Vector2Int.one * 16 }, { Finger.ID.M_R, Vector2Int.one * 16 }, { Finger.ID.An_R, Vector2Int.one * 16 },
+        { Finger.ID.Au_R, Vector2Int.one * 16 }
     };
 
     int IComparable<FrameAnalysis>.CompareTo(FrameAnalysis other) =>
@@ -371,7 +360,7 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
 }
 public class FrameAnalysisData
 {
-    public readonly Dictionary<Finger, Vector2Int> FingerPositions = new() { { Finger.P_L,-Vector2Int.one}, { Finger.I_L,-Vector2Int.one}, { Finger.M_L,-Vector2Int.one}, { Finger.An_L,-Vector2Int.one}, { Finger.Au_L,-Vector2Int.one}, { Finger.P_R,-Vector2Int.one}, { Finger.I_R,-Vector2Int.one}, { Finger.M_R,-Vector2Int.one}, { Finger.An_R,-Vector2Int.one}, { Finger.Au_R,-Vector2Int.one} };
+    public readonly Dictionary<Finger.ID, Vector2Int> FingerPositions = new() { { Finger.ID.P_L,-Vector2Int.one}, { Finger.ID.I_L,-Vector2Int.one}, { Finger.ID.M_L,-Vector2Int.one}, { Finger.ID.An_L,-Vector2Int.one}, { Finger.ID.Au_L,-Vector2Int.one}, { Finger.ID.P_R,-Vector2Int.one}, { Finger.ID.I_R,-Vector2Int.one}, { Finger.ID.M_R,-Vector2Int.one}, { Finger.ID.An_R,-Vector2Int.one}, { Finger.ID.Au_R,-Vector2Int.one} };
     public override string ToString()
     {
         var @return = "";

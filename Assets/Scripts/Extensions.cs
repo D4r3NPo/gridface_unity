@@ -11,6 +11,8 @@ using System.Reflection;
 
 public static class Extensions
 {
+    public static Sprite Icon(this Finger.ID finger) => SpriteManager.Singleton.m_fingersIcons[(int)(finger-1)];
+
     public static void ClearChild(this Transform transform, bool Immediately = false)
     {
         foreach (Transform child in transform)
