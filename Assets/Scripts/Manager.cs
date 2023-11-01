@@ -216,7 +216,9 @@ public class Manager : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.LeftArrow)) Previous(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
             if (Input.GetKeyDown(KeyCode.RightArrow)) Next(Input.GetKey(KeyCode.RightShift) || Input.GetKey(KeyCode.LeftShift));
-            Console.text = $"t : {Player.time}/{Player.length:0.1}\nf : {Player.frame}/{Player.frameCount}";
+            Console.text = $"[  T  ] : {Player.time}/{Player.length:0.1}\n" +
+                           $"[  % ] : {(float)Player.frame / Player.frameCount * 100.0f:F} %\n" +
+                           $"[img] : {Player.frame}/{Player.frameCount}";
         }
         else Console.text = NoVideo;
 
@@ -226,11 +228,18 @@ public class Manager : MonoBehaviour
         //Zoom
         if (Input.GetKeyDown(KeyCode.P)) Zoom -= 0.1f;
         if (Input.GetKeyDown(KeyCode.M)) Zoom += 0.1f;
+       
         //Video View
         if (Input.GetKeyDown(KeyCode.L)) OffSet = new Vector2(OffSet.x + 0.1f, OffSet.y);
         if (Input.GetKeyDown(KeyCode.I)) OffSet = new Vector2(OffSet.x, OffSet.y + 0.1f);
         if (Input.GetKeyDown(KeyCode.J)) OffSet = new Vector2(OffSet.x - 0.1f, OffSet.y);
         if (Input.GetKeyDown(KeyCode.K)) OffSet = new Vector2(OffSet.x, OffSet.y - 0.1f);
+
+        if (Input.GetKeyDown(KeyCode.O))
+        {
+            Zoom = 1f;
+            OffSet = Vector2.zero;
+        }
     }
 
     const string NoVideo = "No video loaded";
@@ -362,7 +371,7 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
 }
 public class FrameAnalysisData
 {
-    public readonly Dictionary<Finger, Vector2Int> FingerPositions = new Dictionary<Finger, Vector2Int> { { Finger.P_L,-Vector2Int.one}, { Finger.I_L,-Vector2Int.one}, { Finger.M_L,-Vector2Int.one}, { Finger.An_L,-Vector2Int.one}, { Finger.Au_L,-Vector2Int.one}, { Finger.P_R,-Vector2Int.one}, { Finger.I_R,-Vector2Int.one}, { Finger.M_R,-Vector2Int.one}, { Finger.An_R,-Vector2Int.one}, { Finger.Au_R,-Vector2Int.one} };
+    public readonly Dictionary<Finger, Vector2Int> FingerPositions = new() { { Finger.P_L,-Vector2Int.one}, { Finger.I_L,-Vector2Int.one}, { Finger.M_L,-Vector2Int.one}, { Finger.An_L,-Vector2Int.one}, { Finger.Au_L,-Vector2Int.one}, { Finger.P_R,-Vector2Int.one}, { Finger.I_R,-Vector2Int.one}, { Finger.M_R,-Vector2Int.one}, { Finger.An_R,-Vector2Int.one}, { Finger.Au_R,-Vector2Int.one} };
     public override string ToString()
     {
         var @return = "";
