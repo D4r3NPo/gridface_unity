@@ -45,8 +45,12 @@ public class App : MonoBehaviour
 
     public void ToggleFlag()
     {
-        
+        _currentFrame.IsFlag = !_currentFrame.IsFlag;
+        Clear();
+        UpdateFlag();
     }
+
+    void UpdateFlag() => m_flag.Enable = _currentFrame.IsFlag;
 
     [Header("--- Setting ---")] public long Step;
     
@@ -88,7 +92,8 @@ public class App : MonoBehaviour
     const int KChars = 700;
     public string loadedVideo = string.Empty;
     FrameAnalysisData _currentFrame = new();
-    Dictionary<long,FrameAnalysis> _frames;
+    readonly SortedDictionary<long, FrameAnalysis> _frames = new();
+    //Dictionary<long,FrameAnalysis> _frames;
 
     void Awake() => Instance = this;
 
@@ -201,7 +206,7 @@ public class App : MonoBehaviour
         string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
 
         //Init Frames
-        _frames = new Dictionary<long, FrameAnalysis>();
+        _frames.Clear();
 
         //Create File if it doesn'n exist
         if (!File.Exists(path)) File.Create(path);
@@ -209,21 +214,52 @@ public class App : MonoBehaviour
         {
             //Load Frames from file
             var loadedFrames = File.ReadAllLines(path);
-            foreach (var line in loadedFrames)
+            for (int f = 1; f < loadedFrames.Length; f++)
             {
-                //Skip Title
-                if (line == loadedFrames[0]) continue;
+                string line = loadedFrames[f];
+                
+                string[] stringValues = line.Split(',');
+                int[] values = new int[stringValues.Length];
 
-                var stringValues = line.Split(',');
-                var values = new int[stringValues.Length];
-                for (var i = 0; i < values.Length; i++)
-                    values[i] = stringValues[i] != string.Empty ? int.Parse(stringValues[i]) : -1;
+                if (stringValues.Length < 1) throw new Exception("Parsing error : invalid csv file");
 
-                FrameAnalysis newFrame = new(values[0]) { Fingers = { [Finger.ID.P_L] = new Vector2Int(values[1], values[2]), [Finger.ID.I_L] = new Vector2Int(values[3], values[4]), [Finger.ID.M_L] = new Vector2Int(values[5], values[6]), [Finger.ID.An_L] = new Vector2Int(values[7], values[8]), [Finger.ID.Au_L] = new Vector2Int(values[9], values[10]), [Finger.ID.P_R] = new Vector2Int(values[11], values[12]), [Finger.ID.I_R] = new Vector2Int(values[13], values[14]), [Finger.ID.M_R] = new Vector2Int(values[15], values[16]), [Finger.ID.An_R] = new Vector2Int(values[17], values[18]), [Finger.ID.Au_R] = new Vector2Int(values[19], values[20]) } };
-                _frames.Add(values[0],newFrame);
+                bool isFLag = stringValues[1] == "=";
+                if (isFLag)
+                {
+                    values[0] = stringValues[0] != string.Empty && int.TryParse(stringValues[0], out int value)
+                        ? value
+                        : -1;
+                    for (int i = 1; i < values.Length; i++) values[i] = -1;
+                }
+                else
+                {
+                    for (int i = 0; i < values.Length; i++)
+                        values[i] = stringValues[i] != string.Empty && int.TryParse(stringValues[i], out int value)
+                            ? value
+                            : -1;
+                }
+
+                FrameAnalysis newFrame = new(values[0])
+                {
+                    Fingers =
+                    {
+                        [Finger.ID.P_L] = new Vector2Int(values[1], values[2]),
+                        [Finger.ID.I_L] = new Vector2Int(values[3], values[4]),
+                        [Finger.ID.M_L] = new Vector2Int(values[5], values[6]),
+                        [Finger.ID.An_L] = new Vector2Int(values[7], values[8]),
+                        [Finger.ID.Au_L] = new Vector2Int(values[9], values[10]),
+                        [Finger.ID.P_R] = new Vector2Int(values[11], values[12]),
+                        [Finger.ID.I_R] = new Vector2Int(values[13], values[14]),
+                        [Finger.ID.M_R] = new Vector2Int(values[15], values[16]),
+                        [Finger.ID.An_R] = new Vector2Int(values[17], values[18]),
+                        [Finger.ID.Au_R] = new Vector2Int(values[19], values[20])
+                    },
+                    isFlag = isFLag
+                };
+                _frames.Add(values[0], newFrame);
             }
         }
-        _currentFrame = _frames.TryGetValue(0,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
+        _currentFrame = _frames.TryGetValue(0,out FrameAnalysis frame)? frame.ToData() : new FrameAnalysisData();
         UpdateGridButton();
     }
 
@@ -275,6 +311,7 @@ public class App : MonoBehaviour
 
     void UpdateGridButton()
     {
+        UpdateFlag();
         foreach (var fingerData in _currentFrame.FingerPositions)
             PositionChanged?.Invoke(fingerData.Key, new Position((Column)fingerData.Value.y, (Row)fingerData.Value.x));
     }
@@ -292,8 +329,6 @@ public class App : MonoBehaviour
     
     void UpdateCsv()
     {
-        Debug.Log("UpdateCSV");
-        
         var frame = Player.frame;
         
         if(_frames.TryGetValue(frame,out var value)) value.FromData(_currentFrame);
@@ -329,7 +364,7 @@ public class App : MonoBehaviour
 public class FrameAnalysis : IComparable<FrameAnalysis>
 {
     readonly long _frame;
-    public bool flagged = false;
+    public bool isFlag = false;
 
     public readonly Dictionary<Finger.ID, Vector2Int> Fingers = new()
     {
@@ -346,35 +381,48 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
     public FrameAnalysis(long frame, FrameAnalysisData data)
     {
         _frame = frame;
+        isFlag = isFlag;
         foreach (var dataFinger in data.FingerPositions) Fingers[dataFinger.Key] = dataFinger.Value;
     }
 
     public void FromData(FrameAnalysisData data)
     {
+        isFlag = data.IsFlag;
         foreach (var dataFinger in data.FingerPositions) Fingers[dataFinger.Key] = dataFinger.Value;
     }
 
     public override string ToString()
     {
         var line = $"{_frame},";
-        foreach (Vector2Int finger in Fingers.Values) line += $"{finger.x},{finger.y},";
+        foreach (Vector2Int finger in Fingers.Values) line += isFlag ? "=,=," : $"{finger.x},{finger.y},";
+        // Remove last coma
         return line.Remove(line.Length - 1);
     }
 
     public FrameAnalysisData ToData()
     {
-        FrameAnalysisData data = new FrameAnalysisData();
+        FrameAnalysisData data = new FrameAnalysisData { IsFlag = isFlag };
         foreach (var finger in Fingers) data.FingerPositions[finger.Key] = finger.Value;
         return data;
     }
 }
+
 public class FrameAnalysisData
 {
-    public readonly Dictionary<Finger.ID, Vector2Int> FingerPositions = new() { { Finger.ID.P_L,-Vector2Int.one}, { Finger.ID.I_L,-Vector2Int.one}, { Finger.ID.M_L,-Vector2Int.one}, { Finger.ID.An_L,-Vector2Int.one}, { Finger.ID.Au_L,-Vector2Int.one}, { Finger.ID.P_R,-Vector2Int.one}, { Finger.ID.I_R,-Vector2Int.one}, { Finger.ID.M_R,-Vector2Int.one}, { Finger.ID.An_R,-Vector2Int.one}, { Finger.ID.Au_R,-Vector2Int.one} };
+    public bool IsFlag = false;
+
+    public readonly Dictionary<Finger.ID, Vector2Int> FingerPositions = new()
+    {
+        { Finger.ID.P_L, -Vector2Int.one }, { Finger.ID.I_L, -Vector2Int.one }, { Finger.ID.M_L, -Vector2Int.one },
+        { Finger.ID.An_L, -Vector2Int.one }, { Finger.ID.Au_L, -Vector2Int.one }, { Finger.ID.P_R, -Vector2Int.one },
+        { Finger.ID.I_R, -Vector2Int.one }, { Finger.ID.M_R, -Vector2Int.one }, { Finger.ID.An_R, -Vector2Int.one },
+        { Finger.ID.Au_R, -Vector2Int.one }
+    };
+
     public override string ToString()
     {
         var @return = "";
-        foreach (Vector2Int finger in FingerPositions.Values) @return += $"{finger.x},{finger.y},";
+        foreach (Vector2Int finger in FingerPositions.Values) @return += IsFlag?"=,=,":$"{finger.x},{finger.y},";
         return @return.Remove(@return.Length - 1);
     }
 }
