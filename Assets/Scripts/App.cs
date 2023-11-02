@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using UnityEngine.Video;
 using File = System.IO.File;
@@ -33,7 +32,22 @@ public class App : MonoBehaviour
 { 
     public static App Instance;
     public event Action<Finger.ID, Position> PositionChanged;
-    
+
+    [SerializeField] Flag m_flag;
+    public void Clear()
+    {
+        foreach (Finger.ID finger in Enum.GetValues(typeof(Finger.ID)))
+        {
+            if(finger == Finger.ID.None) continue;
+            MoveFingerTo(finger,Position.None);
+        }
+    }
+
+    public void ToggleFlag()
+    {
+        
+    }
+
     [Header("--- Setting ---")] public long Step;
     
     const string NoVideo = "No video loaded";
@@ -267,8 +281,6 @@ public class App : MonoBehaviour
 
     public void MoveFingerTo(Finger.ID fingerID, Position position)
     {
-        Debug.Log("Move" + fingerID + " Finger To " + position);
-        
         if (!IsVideoLoaded || fingerID == Finger.ID.None) return;
 
         _currentFrame.FingerPositions[fingerID] = new Vector2Int((int)position.Row, (int)position.Column);
@@ -277,23 +289,20 @@ public class App : MonoBehaviour
         
         UpdateCsv();
     }
-
-    static Finger.ID GetFinger() => Input.GetKey(KeyCode.Space) ? Input.GetKey(KeyCode.C) ? Finger.ID.P_R : Input.GetKey(KeyCode.F) ? Finger.ID.I_R : Input.GetKey(KeyCode.E) ? Finger.ID.M_R : Input.GetKey(KeyCode.Z) ? Finger.ID.An_R : Input.GetKey(KeyCode.Q) ? Finger.ID.Au_R : Finger.ID.None : Input.GetKey(KeyCode.C) ? Finger.ID.P_L : Input.GetKey(KeyCode.F) ? Finger.ID.I_L : Input.GetKey(KeyCode.E) ? Finger.ID.M_L : Input.GetKey(KeyCode.Z) ? Finger.ID.An_L : Input.GetKey(KeyCode.Q) ? Finger.ID.Au_L : Finger.ID.None;
-    public void OnButton(GridButton button) => MoveFingerTo(GetFinger(), button.Position);
-
+    
     void UpdateCsv()
     {
         Debug.Log("UpdateCSV");
         
         var frame = Player.frame;
         
-        if(_frames.TryGetValue(frame,out FrameAnalysis value)) value.FromData(_currentFrame);
+        if(_frames.TryGetValue(frame,out var value)) value.FromData(_currentFrame);
         else _frames.Add(Player.frame,new FrameAnalysis(frame, _currentFrame));
 
         var lines = new List<string> { Header };
-        foreach (FrameAnalysis frameAnalysis in _frames.Values) lines.Add(frameAnalysis.ToString());
+        foreach (var frameAnalysis in _frames.Values) lines.Add(frameAnalysis.ToString());
 
-        var path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
+        string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
         File.WriteAllLines(path, lines);
     }
 
@@ -320,6 +329,7 @@ public class App : MonoBehaviour
 public class FrameAnalysis : IComparable<FrameAnalysis>
 {
     readonly long _frame;
+    public bool flagged = false;
 
     public readonly Dictionary<Finger.ID, Vector2Int> Fingers = new()
     {
@@ -346,9 +356,9 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
 
     public override string ToString()
     {
-        var @return = $"{_frame},";
-        foreach (Vector2Int finger in Fingers.Values) @return += $"{finger.x},{finger.y},";
-        return @return.Remove(@return.Length - 1);
+        var line = $"{_frame},";
+        foreach (Vector2Int finger in Fingers.Values) line += $"{finger.x},{finger.y},";
+        return line.Remove(line.Length - 1);
     }
 
     public FrameAnalysisData ToData()
