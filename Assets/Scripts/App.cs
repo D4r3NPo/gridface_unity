@@ -1,10 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Video;
+using Debug = UnityEngine.Debug;
 using File = System.IO.File;
 
 public enum Row { Un, Deux, Trois, Quatre, Cinq, Six, Sept, Huit, Neuf, Dix, Onze, Douze, Treize, Quatoze, Quinze, None = -1 }
@@ -93,6 +97,8 @@ public class App : MonoBehaviour
     public string loadedVideo = string.Empty;
     FrameAnalysisData _currentFrame = new();
     readonly SortedDictionary<long, FrameAnalysis> _frames = new();
+
+    Coroutine operation;
     //Dictionary<long,FrameAnalysis> _frames;
 
     void Awake() => Instance = this;
@@ -107,18 +113,21 @@ public class App : MonoBehaviour
 
     IEnumerator SimplePrevious()
     {
+        if(operation != null) StopCoroutine(operation);
         long startFrame = Player.frame;
-        Player.frame = startFrame - Step <= 0 ? 0 : Player.frame - Step;
-        while (Player.frame == startFrame) yield return null;
+        Player.frame = Snap((long)Mathf.Clamp(startFrame - Step, 0, Player.frameCount));
+        while (Player.frame == startFrame) 
+            yield return null;
         _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
     }
 
     IEnumerator CopyPrevious()
     {
+        if(operation != null) StopCoroutine(operation);
         FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
-        Player.frame = startFrame - Step <= 0 ? 0 : Player.frame - Step;
+        Player.frame = Snap(startFrame - Step <= 0 ? 0 : Player.frame - Step);
         while (Player.frame == startFrame) yield return null;
         _currentFrame = save;
         UpdateCsv();
@@ -127,8 +136,9 @@ public class App : MonoBehaviour
 
     IEnumerator SimpleNext()
     {
+        if(operation != null) StopCoroutine(operation);
         long startFrame = Player.frame;
-        Player.frame = startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : Player.frame + Step;
+        Player.frame = Snap(startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : Player.frame + Step);
         while (Player.frame == startFrame) yield return null;
         _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
@@ -136,19 +146,33 @@ public class App : MonoBehaviour
 
     IEnumerator CopyNext()
     {
+        if(operation != null) StopCoroutine(operation);
         FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
-        Player.frame = startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : (Player.frame + Step);
+        Player.frame = Snap(startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : (Player.frame + Step));
         while (Player.frame == startFrame) yield return null;
         _currentFrame = save;
         UpdateCsv();
         UpdateGridButton();
     }
 
+    // TODO Report to Unity inconsistency in Types
+    long Snap(int value) => SnapToInterval(value, (int)Step);
+    long Snap(long value) => SnapToInterval((int)value, (int)Step);
+    static int SnapToInterval(int value, int interval)
+    {
+        // Calculate the remainder when dividing the value by the interval
+        int remainder = value % interval;
+
+        // If the remainder is less than half of the interval, snap down; otherwise, snap up
+        return remainder < interval / 2 ? value - remainder : value + (interval - remainder);
+    }
+    
     IEnumerator SeekingFor(float time)
     {
+        if(operation != null) StopCoroutine(operation);
         long startFrame = Player.frame;
-        Player.frame = (long)time;
+        Player.frame = Snap((long)time);
         while (Player.frame == startFrame) yield return null;
         _currentFrame = _frames.TryGetValue(Player.frame,out FrameAnalysis value)? value.ToData() : new FrameAnalysisData();
         UpdateGridButton();
@@ -189,7 +213,8 @@ public class App : MonoBehaviour
         {
             Player.url = "file://" + Videopath + "/" + videoName;
             loadedVideo = videoName;
-            while (Player.frameCount == 0) yield return null;
+            Player.Prepare();
+            while (Player.frameCount == 0 || !Player.isPrepared) yield return null;
             Timeline.maxValue = Player.frameCount;
             LoadCsv();
         }
@@ -333,12 +358,17 @@ public class App : MonoBehaviour
         
         if(_frames.TryGetValue(frame,out var value)) value.FromData(_currentFrame);
         else _frames.Add(Player.frame,new FrameAnalysis(frame, _currentFrame));
-
+        
+        Stopwatch stopwatch = new();
+        stopwatch.Start();
+        
         var lines = new List<string> { Header };
-        foreach (var frameAnalysis in _frames.Values) lines.Add(frameAnalysis.ToString());
-
+        lines.AddRange(_frames.Values.Select(frameAnalysis => frameAnalysis.ToString()));
         string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
         File.WriteAllLines(path, lines);
+        
+        stopwatch.Stop();
+        Debug.Log($"Update CSV : {stopwatch.ElapsedMilliseconds} ms");
     }
 
    
@@ -381,7 +411,7 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
     public FrameAnalysis(long frame, FrameAnalysisData data)
     {
         _frame = frame;
-        isFlag = isFlag;
+        isFlag = data.IsFlag;
         foreach (var dataFinger in data.FingerPositions) Fingers[dataFinger.Key] = dataFinger.Value;
     }
 
