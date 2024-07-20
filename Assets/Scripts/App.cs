@@ -37,7 +37,8 @@ public class App : MonoBehaviour
     public static App Instance;
     public event Action<Finger.ID, Position> PositionChanged;
 
-    [SerializeField] Flag m_flag;
+    [SerializeField] private Flag m_flag;
+    [SerializeField] private InputField m_nameInputField;
     public void Clear()
     {
         foreach (Finger.ID finger in Enum.GetValues(typeof(Finger.ID)))
@@ -54,12 +55,20 @@ public class App : MonoBehaviour
         UpdateFlag();
     }
 
-    void UpdateFlag() => m_flag.Enable = _currentFrame.IsFlag;
+    public void SetFrameName(string name)
+    {
+        if (_currentFrame.IsFlag)
+        {
+            _currentFrame.Name = 
+        }
+    }
+
+    private void UpdateFlag() => m_flag.Enable = _currentFrame.IsFlag;
 
     [Header("--- Setting ---")] public long Step;
-    
-    const string NoVideo = "No video loaded";
-    bool IsVideoLoaded => loadedVideo != string.Empty;
+
+    private const string NoVideo = "No video loaded";
+    private bool IsVideoLoaded => loadedVideo != string.Empty;
     
     #region Components
 
@@ -78,42 +87,42 @@ public class App : MonoBehaviour
 
     #region Path
 
-    readonly string _rootPath = Path.Combine(
+    private readonly string RootPath = Path.Combine(
         Application.platform == RuntimePlatform.IPhonePlayer ?
             Application.persistentDataPath
             : Environment.GetFolderPath(Environment.SpecialFolder.Desktop) ,
         "GridFace");
 
-    string Videopath => Path.Combine(_rootPath, "Video");
-    string Datapath => Path.Combine(_rootPath, "Data");
+    private string VideoPath => Path.Combine(RootPath, "Video");
+    private string DataPath => Path.Combine(RootPath, "Data");
 
     #endregion
-    
-    const string Header = "Frame,Pouce_L.x ,Pouce_L.y ,Index_L.x ,Index_L.y ,Majeur_L.x ,Majeur_L.y,Annulaire_L.x ,Annulaire_L.y,Auriculaire_L.x,Auriculaire_L.y,Pouce_R.x,Pouce_R.y,Index_R.x,Index_R.y ,Majeur_R.x,Majeur_R.y,Annulaire_R.x,Annulaire_R.y,Auriculaire_R.x,Auriculaire_R.y";
-    
-    string _myLog = "TAB ->| to mask";
-    bool _doShow;
-    const int KChars = 700;
-    public string loadedVideo = string.Empty;
-    FrameAnalysisData _currentFrame = new();
-    readonly SortedDictionary<long, FrameAnalysis> _frames = new();
 
-    Coroutine operation;
+    private const string Header = "Frame,Pouce_L.x ,Pouce_L.y ,Index_L.x ,Index_L.y ,Majeur_L.x ,Majeur_L.y,Annulaire_L.x ,Annulaire_L.y,Auriculaire_L.x,Auriculaire_L.y,Pouce_R.x,Pouce_R.y,Index_R.x,Index_R.y ,Majeur_R.x,Majeur_R.y,Annulaire_R.x,Annulaire_R.y,Auriculaire_R.x,Auriculaire_R.y";
+
+    private string _myLog = "TAB ->| to mask";
+    private bool _doShow;
+    private const int KChars = 700;
+    public string loadedVideo = string.Empty;
+    private FrameAnalysisData _currentFrame = new();
+    private readonly SortedDictionary<long, FrameAnalysis> _frames = new();
+
+    private Coroutine m_operation;
     //Dictionary<long,FrameAnalysis> _frames;
 
-    void Awake() => Instance = this;
+    private void Awake() => Instance = this;
 
-    void Start()
+    private void Start()
     {
-        if (!Directory.Exists(Videopath)) Directory.CreateDirectory(Videopath);
-        if (!Directory.Exists(Datapath)) Directory.CreateDirectory(Datapath);
+        if (!Directory.Exists(VideoPath)) Directory.CreateDirectory(VideoPath);
+        if (!Directory.Exists(DataPath)) Directory.CreateDirectory(DataPath);
     }
 
     #region Controls
 
-    IEnumerator SimplePrevious()
+    private IEnumerator SimplePrevious()
     {
-        if(operation != null) StopCoroutine(operation);
+        if(m_operation != null) StopCoroutine(m_operation);
         long startFrame = Player.frame;
         Player.frame = Snap((long)Mathf.Clamp(startFrame - Step, 0, Player.frameCount));
         while (Player.frame == startFrame) 
@@ -122,9 +131,9 @@ public class App : MonoBehaviour
         UpdateGridButton();
     }
 
-    IEnumerator CopyPrevious()
+    private IEnumerator CopyPrevious()
     {
-        if(operation != null) StopCoroutine(operation);
+        if(m_operation != null) StopCoroutine(m_operation);
         FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
         Player.frame = Snap(startFrame - Step <= 0 ? 0 : Player.frame - Step);
@@ -134,9 +143,9 @@ public class App : MonoBehaviour
         UpdateGridButton();
     }
 
-    IEnumerator SimpleNext()
+    private IEnumerator SimpleNext()
     {
-        if(operation != null) StopCoroutine(operation);
+        if(m_operation != null) StopCoroutine(m_operation);
         long startFrame = Player.frame;
         Player.frame = Snap(startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : Player.frame + Step);
         while (Player.frame == startFrame) yield return null;
@@ -144,9 +153,9 @@ public class App : MonoBehaviour
         UpdateGridButton();
     }
 
-    IEnumerator CopyNext()
+    private IEnumerator CopyNext()
     {
-        if(operation != null) StopCoroutine(operation);
+        if(m_operation != null) StopCoroutine(m_operation);
         FrameAnalysisData save = _currentFrame;
         long startFrame = Player.frame;
         Player.frame = Snap(startFrame + Step >= (long)Player.frameCount ? (long)Player.frameCount : (Player.frame + Step));
@@ -157,9 +166,10 @@ public class App : MonoBehaviour
     }
 
     // TODO Report to Unity inconsistency in Types
-    long Snap(int value) => SnapToInterval(value, (int)Step);
-    long Snap(long value) => SnapToInterval((int)value, (int)Step);
-    static int SnapToInterval(int value, int interval)
+    private long Snap(int value) => SnapToInterval(value, (int)Step);
+    private long Snap(long value) => SnapToInterval((int)value, (int)Step);
+
+    private static int SnapToInterval(int value, int interval)
     {
         // Calculate the remainder when dividing the value by the interval
         int remainder = value % interval;
@@ -167,10 +177,10 @@ public class App : MonoBehaviour
         // If the remainder is less than half of the interval, snap down; otherwise, snap up
         return remainder < interval / 2 ? value - remainder : value + (interval - remainder);
     }
-    
-    IEnumerator SeekingFor(float time)
+
+    private IEnumerator SeekingFor(float time)
     {
-        if(operation != null) StopCoroutine(operation);
+        if(m_operation != null) StopCoroutine(m_operation);
         long startFrame = Player.frame;
         Player.frame = Snap((long)time);
         while (Player.frame == startFrame) yield return null;
@@ -199,7 +209,7 @@ public class App : MonoBehaviour
         {
             Videos.SetActive(true);
             Instantiate(VideoButton.GetComponentInChildren<VideoButton>(), VideoGrid).Name = "CLOSE";
-            foreach (FileInfo file in new DirectoryInfo(Videopath).GetFiles("*.mp4"))
+            foreach (FileInfo file in new DirectoryInfo(VideoPath).GetFiles("*.mp4"))
                 if (file.Name[0] != '.')
                     Instantiate(VideoButton.GetComponentInChildren<VideoButton>(), VideoGrid).Name = file.Name;
         }
@@ -207,11 +217,11 @@ public class App : MonoBehaviour
 
     public void LoadVideo(string videoName) => StartCoroutine(LoadingVideo(videoName));
 
-    IEnumerator LoadingVideo(string videoName)
+    private IEnumerator LoadingVideo(string videoName)
     {
         if (videoName != "CLOSE")
         {
-            Player.url = "file://" + Videopath + "/" + videoName;
+            Player.url = "file://" + VideoPath + "/" + videoName;
             loadedVideo = videoName;
             Player.Prepare();
             while (Player.frameCount == 0 || !Player.isPrepared) yield return null;
@@ -222,18 +232,18 @@ public class App : MonoBehaviour
         Videos.SetActive(false);
         VideoGrid.ClearChild();
     }
-    
-    void LoadCsv()
+
+    private void LoadCsv()
     {
         Debug.Log("Load From CSV");
         
         //Find Curren Load Video Path
-        string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
+        string path = Path.Combine(RootPath, DataPath, loadedVideo.Split('.')[0] + ".csv");
 
         //Init Frames
         _frames.Clear();
 
-        //Create File if it doesn'n exist
+        //Create File if it doesn't exist
         if (!File.Exists(path)) File.Create(path);
         else
         {
@@ -288,20 +298,21 @@ public class App : MonoBehaviour
         UpdateGridButton();
     }
 
-    float Zoom
+    private float Zoom
     {
         get => RawImage.uvRect.width;
         set => RawImage.uvRect = new Rect(OffSet.x, OffSet.y, value, value);
     }
 
-    Vector2 OffSet
+    private Vector2 OffSet
     {
         get => new(RawImage.uvRect.x, RawImage.uvRect.y);
         set => RawImage.uvRect = new Rect(value, RawImage.uvRect.size);
     }
 
-    void Update() => Inputs();
-    void Inputs()
+    private void Update() => Inputs();
+
+    private void Inputs()
     {
         //Controls
         if (Player.url != string.Empty)
@@ -334,7 +345,7 @@ public class App : MonoBehaviour
         }
     }
 
-    void UpdateGridButton()
+    private void UpdateGridButton()
     {
         UpdateFlag();
         foreach (var fingerData in _currentFrame.FingerPositions)
@@ -351,8 +362,8 @@ public class App : MonoBehaviour
         
         UpdateCsv();
     }
-    
-    void UpdateCsv()
+
+    private void UpdateCsv()
     {
         var frame = Player.frame;
         
@@ -364,26 +375,27 @@ public class App : MonoBehaviour
         
         var lines = new List<string> { Header };
         lines.AddRange(_frames.Values.Select(frameAnalysis => frameAnalysis.ToString()));
-        string path = Path.Combine(_rootPath, Datapath, loadedVideo.Split('.')[0] + ".csv");
+        string path = Path.Combine(RootPath, DataPath, loadedVideo.Split('.')[0] + ".csv");
         File.WriteAllLines(path, lines);
         
         stopwatch.Stop();
         Debug.Log($"Update CSV : {stopwatch.ElapsedMilliseconds} ms");
     }
 
-   
-    void OnEnable() => Application.logMessageReceived += Log;
-    void OnDisable() => Application.logMessageReceived -= Log;
-    void Log(string logString, string stackTrace, LogType type)
+
+    private void OnEnable() => Application.logMessageReceived += Log;
+    private void OnDisable() => Application.logMessageReceived -= Log;
+
+    private void Log(string logString, string stackTrace, LogType type)
     {
         _myLog = $"{type}|{stackTrace} {logString}\n{_myLog}";
         if (_myLog.Length > KChars) _myLog = _myLog.Substring(_myLog.Length - KChars);
-        var path = Path.Combine(Datapath, "log.txt");
+        var path = Path.Combine(DataPath, "log.txt");
         try { File.AppendAllText(path, $"{type}|{stackTrace} {logString}\n"); }
         catch { /* ignored*/ }
     }
 
-    void OnGUI()
+    private void OnGUI()
     {
         if (!_doShow) return;
         GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(Screen.width / 1200.0f, Screen.height / 800.0f, 1.0f));
@@ -393,7 +405,7 @@ public class App : MonoBehaviour
 
 public class FrameAnalysis : IComparable<FrameAnalysis>
 {
-    readonly long _frame;
+    private readonly long _frame;
     public bool isFlag = false;
 
     public readonly Dictionary<Finger.ID, Vector2Int> Fingers = new()
@@ -440,6 +452,7 @@ public class FrameAnalysis : IComparable<FrameAnalysis>
 public class FrameAnalysisData
 {
     public bool IsFlag = false;
+    public string Name = "";
 
     public readonly Dictionary<Finger.ID, Vector2Int> FingerPositions = new()
     {
@@ -451,8 +464,22 @@ public class FrameAnalysisData
 
     public override string ToString()
     {
-        var @return = "";
-        foreach (Vector2Int finger in FingerPositions.Values) @return += IsFlag?"=,=,":$"{finger.x},{finger.y},";
-        return @return.Remove(@return.Length - 1);
+        string line = "";
+
+        if (IsFlag)
+            for (int i = -1; i < 19; i++)
+                line += 
+                    i == -1 || // Line Start Mark
+                    i == 18 || // Line End Mark
+                    Name == null || // No name
+                    i >= Name.Length ? // Name Index Check
+                        "=," 
+                        : Name[i];
+        else
+            foreach (Vector2Int finger in FingerPositions.Values) 
+                line += $"{finger.x},{finger.y},";
+        
+        // Remove last comma
+        return line.Remove(line.Length - 1);
     }
 }
